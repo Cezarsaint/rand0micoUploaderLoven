@@ -1,13 +1,13 @@
 # __init__.py
 
-from .hf_batch_uploader import HuggingFaceBatchUploader
+from .hf_batch_uploader import HuggingFaceSimpleUploader
 
 NODE_CLASS_MAPPINGS = {
-    "HuggingFaceBatchUploader": HuggingFaceBatchUploader
+    "HuggingFaceSimpleUploader": HuggingFaceSimpleUploader
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "HuggingFaceBatchUploader": "LovenHugging - - - - HuggingFace Batch Uploader"
+    "HuggingFaceSimpleUploader": "LovenHugging - - - - HuggingFace Batch Uploader"
 }
 
 __all__ = ['NODE_CLASS_MAPPINGS', 'NODE_DISPLAY_NAME_MAPPINGS']
