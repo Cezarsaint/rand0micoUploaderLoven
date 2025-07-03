@@ -1,13 +1,13 @@
 # __init__.py
 
-from .hf_batch_uploader import HuggingFaceSimpleUploader
+from .hf_batch_uploader import HuggingFaceBatchUploader
 
+# Dicionários de mapeamento para ComfyUI
 NODE_CLASS_MAPPINGS = {
-    "HuggingFaceSimpleUploader": HuggingFaceSimpleUploader
+    "HuggingFaceBatchUploader": HuggingFaceBatchUploader
 }
-
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "HuggingFaceSimpleUploader": "LovenHugging - - - - HuggingFace Batch Uploader"
+    "HuggingFaceBatchUploader": "loven HuggingFace Batch Uploader (Simple)"
 }
 
 __all__ = ['NODE_CLASS_MAPPINGS', 'NODE_DISPLAY_NAME_MAPPINGS']
