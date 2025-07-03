@@ -7,7 +7,7 @@ NODE_CLASS_MAPPINGS = {
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "HuggingFaceBatchUploader": "HuggingFace Batch Uploader"
+    "HuggingFaceBatchUploader": "LovenHugging - - - - HuggingFace Batch Uploader"
 }
 
 __all__ = ['NODE_CLASS_MAPPINGS', 'NODE_DISPLAY_NAME_MAPPINGS']
