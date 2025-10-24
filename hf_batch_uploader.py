@@ -87,7 +87,7 @@ class HuggingFaceBatchUploader:
             if not project_name:
                 return ("Informe um nome de projeto ou forneça um Repo ID válido.",)
             try:
-                repo_id, created_repo = self.prepare_model_repo(api, hf_token, project_name)
+                repo_id, created_repo = self.prepare_model_repo(api, project_name)
                 action = "criado" if created_repo else "existente"
                 print(f"[HF Uploader] Repositório {action} detectado: '{repo_id}'.")
             except Exception as repo_error:
@@ -159,7 +159,7 @@ class HuggingFaceBatchUploader:
 
         return (status_msg,)
 
-    def prepare_model_repo(self, api, hf_token, project_name):
+    def prepare_model_repo(self, api, project_name):
         """Garante que exista um repositório de modelo com base no nome do projeto."""
         slug = self.slugify_project_name(project_name)
         if not slug:
@@ -178,7 +178,7 @@ class HuggingFaceBatchUploader:
         if api.repo_exists(repo_id=repo_id, repo_type="model"):
             return repo_id, False
 
-        api.create_repo(name=repo_name, repo_type="model", exist_ok=False, token=hf_token)
+        api.create_repo(repo_id=repo_id, repo_type="model", exist_ok=False)
         return repo_id, True
 
     def slugify_project_name(self, project_name):
