@@ -1,6 +1,7 @@
 # hf_batch_uploader_simplified.py
 
 import os
+import re
 import datetime
 import zipfile
 import json
@@ -27,7 +28,8 @@ class HuggingFaceBatchUploader:
                 ## MODIFICADO: Renomeado de 'base_folder' para 'upload_folder' para maior clareza
                 "upload_folder": ("STRING", {"multiline": False, "default": "D:/ComfyUI/output/MyCharacter"}),
                 "hf_token": ("STRING", {"multiline": True, "default": ""}),
-                "repo_id": ("STRING", {"multiline": False, "default": "username/repo-name"}),
+                "repo_id": ("STRING", {"multiline": False, "default": ""}),
+                "project_name": ("STRING", {"multiline": False, "default": ""}),
                 "upload_every_x_images": ("INT", {"default": 50, "min": 1, "max": 10000, "step": 1}),
                 "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
             },
@@ -70,10 +72,28 @@ class HuggingFaceBatchUploader:
     ## REMOVIDO: A função 'find_file_by_base_name' não é mais necessária ##
 
     ## MODIFICADO: A assinatura e a lógica da função foram simplificadas ##
-    def execute(self, upload_folder, hf_token, repo_id, upload_every_x_images, seed, prompt=None, extra_pnginfo=None, image_trigger=None):
+    def execute(self, upload_folder, hf_token, repo_id, project_name, upload_every_x_images, seed, prompt=None, extra_pnginfo=None, image_trigger=None):
         """Lógica principal do node."""
-        if not hf_token or not repo_id or repo_id == "username/repo-name":
-            return ("Token ou Repo ID do Hugging Face não fornecido. Pulando upload.",)
+        if not hf_token:
+            return ("Token do Hugging Face não fornecido. Pulando upload.",)
+
+        repo_id = (repo_id or "").strip()
+        project_name = (project_name or "").strip()
+
+        api = HfApi(token=hf_token)
+        created_repo = False
+
+        if not repo_id or repo_id == "username/repo-name":
+            if not project_name:
+                return ("Informe um nome de projeto ou forneça um Repo ID válido.",)
+            try:
+                repo_id, created_repo = self.prepare_model_repo(api, hf_token, project_name)
+                action = "criado" if created_repo else "existente"
+                print(f"[HF Uploader] Repositório {action} detectado: '{repo_id}'.")
+            except Exception as repo_error:
+                error_msg = f"ERRO ao preparar repositório automaticamente: {repo_error}"
+                print(f"[HF Uploader] {error_msg}")
+                return (error_msg,)
 
         if not os.path.isdir(upload_folder):
             return (f"ERRO: A pasta de upload '{upload_folder}' não existe.",)
@@ -115,7 +135,6 @@ class HuggingFaceBatchUploader:
                     zf.write(file_path, arcname=filename)
             
             print(f"[HF Uploader] Fazendo upload de '{zip_filename}' para o repositório '{repo_id}'...")
-            api = HfApi(token=hf_token)
             api.upload_file(
                 path_or_fileobj=zip_filepath,
                 path_in_repo=zip_filename,
@@ -139,4 +158,33 @@ class HuggingFaceBatchUploader:
                 print(f"[HF Uploader] Arquivo ZIP local '{zip_filename}' removido.")
 
         return (status_msg,)
+
+    def prepare_model_repo(self, api, hf_token, project_name):
+        """Garante que exista um repositório de modelo com base no nome do projeto."""
+        slug = self.slugify_project_name(project_name)
+        if not slug:
+            raise ValueError("Nome do projeto inválido para gerar o repositório.")
+
+        today = datetime.datetime.now()
+        repo_name = f"{slug}-{today.strftime('%d-%m')}"
+
+        whoami = api.whoami()
+        namespace = whoami.get("name") or whoami.get("id")
+        if not namespace:
+            raise RuntimeError("Não foi possível determinar o namespace do usuário no Hugging Face.")
+
+        repo_id = f"{namespace}/{repo_name}"
+
+        if api.repo_exists(repo_id=repo_id, repo_type="model"):
+            return repo_id, False
+
+        api.create_repo(name=repo_name, repo_type="model", exist_ok=False, token=hf_token)
+        return repo_id, True
+
+    def slugify_project_name(self, project_name):
+        """Normaliza o nome do projeto para um formato aceito em repositórios Hugging Face."""
+        normalized = project_name.strip().lower()
+        normalized = re.sub(r"[^a-z0-9\-_]+", "-", normalized)
+        normalized = re.sub(r"-+", "-", normalized).strip("-_")
+        return normalized or "project"
 
