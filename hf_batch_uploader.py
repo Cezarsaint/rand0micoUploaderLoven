@@ -48,11 +48,28 @@ class HuggingFaceBatchUploader:
     def get_sorted_image_files(self, directory):
         """Retorna uma lista de arquivos de imagem (.png, .jpg, .jpeg, .webp) ordenados numericamente."""
         supported_extensions = {".png", ".jpg", ".jpeg", ".webp"}
-        files = [f for f in os.listdir(directory) if os.path.splitext(f)[1].lower() in supported_extensions]
-        # Filtra o próprio arquivo de log para não ser incluído na contagem de imagens
-        files = [f for f in files if f != ".upload_log.json"]
-        files.sort(key=lambda f: int("".join(filter(str.isdigit, f)) or 0))
-        return files
+        image_paths = []
+
+        for root, _, files in os.walk(directory):
+            for filename in files:
+                if filename == ".upload_log.json":
+                    continue
+
+                _, extension = os.path.splitext(filename)
+                if extension.lower() not in supported_extensions:
+                    continue
+
+                full_path = os.path.join(root, filename)
+                relative_path = os.path.relpath(full_path, directory)
+                image_paths.append(self.normalize_rel_path(relative_path))
+
+        image_paths.sort(
+            key=lambda rel_path: (
+                int("".join(filter(str.isdigit, os.path.basename(rel_path))) or 0),
+                rel_path.lower(),
+            )
+        )
+        return image_paths
 
     def load_upload_log(self, log_path):
         """Carrega a lista de arquivos já enviados de um arquivo de log JSON."""
@@ -60,15 +77,23 @@ class HuggingFaceBatchUploader:
             return set()
         try:
             with open(log_path, 'r') as f:
-                return set(json.load(f))
+                raw_entries = json.load(f)
+            if not isinstance(raw_entries, list):
+                return set()
+            return {self.normalize_rel_path(str(entry)) for entry in raw_entries}
         except (json.JSONDecodeError, IOError):
             return set()
 
     def save_upload_log(self, log_path, uploaded_files_set):
         """Salva a lista atualizada de arquivos enviados para o log JSON."""
+        normalized_entries = sorted(self.normalize_rel_path(entry) for entry in uploaded_files_set)
         with open(log_path, 'w') as f:
-            json.dump(list(uploaded_files_set), f, indent=4)
-            
+            json.dump(normalized_entries, f, indent=4)
+
+    def normalize_rel_path(self, rel_path):
+        """Normaliza separadores de caminho para garantir consistência no log."""
+        return rel_path.replace("\\", "/")
+
     ## REMOVIDO: A função 'find_file_by_base_name' não é mais necessária ##
 
     ## MODIFICADO: A assinatura e a lógica da função foram simplificadas ##
@@ -130,9 +155,10 @@ class HuggingFaceBatchUploader:
             # Lógica de zipping simplificada
             with zipfile.ZipFile(zip_filepath, 'w', zipfile.ZIP_DEFLATED) as zf:
                 for filename in files_for_batch:
-                    file_path = os.path.join(upload_folder, filename)
-                    # Adiciona o arquivo à raiz do zip
-                    zf.write(file_path, arcname=filename)
+                    file_path = os.path.join(upload_folder, filename.replace("/", os.sep))
+                    arcname = self.normalize_rel_path(os.path.join(folder_name, filename))
+                    # Preserva a hierarquia completa dentro do arquivo ZIP
+                    zf.write(file_path, arcname=arcname)
             
             print(f"[HF Uploader] Fazendo upload de '{zip_filename}' para o repositório '{repo_id}'...")
             api.upload_file(
